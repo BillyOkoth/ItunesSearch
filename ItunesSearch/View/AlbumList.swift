@@ -7,14 +7,31 @@
 import SwiftUI
 
 struct AlbumListView:View {
-    @StateObject var viewModel = AlbumViewModel()
+    
+    @ObservedObject var viewModel = AlbumViewModel()
+    
     var body: some View {
-        List(viewModel.albums){ album in
-            Text(album.artistName)
+        List{
+            ForEach(viewModel.albums){ album in
+                Text(album.collectionName)
+            }
+            switch viewModel.state {
+            case .good:
+                Color.clear.onAppear {
+                    viewModel.loadMore()
+                }
+            case .isLoading:
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .frame(maxWidth: .infinity)
+            case .loadedAll:
+//                EmptyView()
+                Color.clear
+            case .error(let string):
+                Text(string).foregroundColor(.pink)
+            }
         }
         .listStyle(.plain)
-        .navigationTitle("Albums")
-        .searchable(text: $viewModel.searchTerm)
     }
 }
 

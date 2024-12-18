@@ -16,10 +16,23 @@ import Foundation
 import Combine
 
 class AlbumViewModel: ObservableObject {
+    
+    enum State:Comparable {
+        case good ,isLoading ,loadedAll , error(String)
+    }
+    
     @Published var albums: [Album] = []
     @Published var searchTerm: String = ""
+    @Published var state:State = .good {
+        didSet {
+            print("state changed to  \(state)")
+        }
+    }
+    
      
     let limit:Int = 20
+    var page:Int = 0
+    
     var subscriptions = Set<AnyCancellable>()
     
     init () {
@@ -28,23 +41,49 @@ class AlbumViewModel: ObservableObject {
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
             .sink { term  in
             Task {
-                try await self.searchAlbums(term: term)
+                self.state = .good
+                self.page = 0
+                self.albums = []
+                try await self.searchAlbums(for : term)
             }
         }.store(in: &subscriptions)
     }
     
     
-    func searchAlbums(term:String) async throws {
-        let url = URL(string: "https://itunes.apple.com/search?term=\(term)&entity=album&limit=\(limit)")!
+    func loadMore(){
+        Task {
+           try await searchAlbums(for: searchTerm )
+        }
+    }
+    
+    
+    func searchAlbums(for term:String) async throws {
+        
+        guard !searchTerm.isEmpty else { return }
+        
+        guard state == State.good  else { return }
+        
+        let offset = page * limit
+        let url = URL(string: "https://itunes.apple.com/search?term=\(term)&entity=album&limit=\(limit)&offset=\(offset)")!
+        
+        print("start fetching data fro \(searchTerm)")
+        state = .isLoading
+        
         let (data, _) = try await URLSession.shared.data(from: url)
         let decoder = JSONDecoder()
         do {
             let albumResult = try decoder.decode(AlbumResult.self, from: data)
-            albums = albumResult.results
-            print("called")
+            for album in albumResult.results {
+                albums.append(album)
+            }
+            page += 1
+            state = (albumResult.results.count == limit ? .good : .loadedAll)
+          
         } catch {
-            print(error)
+            state = .error("Counldn't decode , \(error.localizedDescription)")
         }
+        state = .good
+        
     }
 }
 
