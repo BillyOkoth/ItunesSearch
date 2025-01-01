@@ -1,19 +1,19 @@
-//
-//  AlbumList.swift
-//  ItunesSearch
-//
-//  Created by Billy Okoth on 17/12/2024.
-//
 import SwiftUI
 
-struct AlbumListView:View {
+
+struct MovieListView:View {
     
-    @ObservedObject var viewModel = AlbumViewModel()
+    @ObservedObject var viewModel = MovieListViewModel()
     
     var body: some View {
         List{
-            ForEach(viewModel.albums){ album in
-                Text(album.collectionName)
+            ForEach(viewModel.movies){ movie in
+                NavigationLink {
+                    MovieDetailView(movie: movie)
+                } label: {
+                    MovieRowView(movie: movie)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             switch viewModel.state {
             case .good:
@@ -25,18 +25,18 @@ struct AlbumListView:View {
                     .progressViewStyle(.circular)
                     .frame(maxWidth: .infinity)
             case .loadedAll:
-//                EmptyView()
                 Color.clear
             case .error(let string):
                 Text(string).foregroundColor(.pink)
             }
         }
         .listStyle(.plain)
+    
     }
 }
 
 #Preview {
     NavigationView {
-        AlbumListView()
+        MovieListView(viewModel: MovieListViewModel())
     }
 }

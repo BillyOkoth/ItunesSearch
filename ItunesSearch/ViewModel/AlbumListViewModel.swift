@@ -8,31 +8,24 @@
 
 //https://itunes.apple.com/search?term=jack+johnson
 // https://itunes.apple.com/search?term=jack+johnson&entity=album&limit=5&offset=10
-// https://itunes.apple.com/search?term=jack+johnson&entity=song&limit=5
+// https://itunes.apple.com/search?term=jack+johnson&entity=song&limit=5&offset=10
 // https://itunes.apple.com/search?term=jack+johnson&entity=movie&limit=5
 
 
 import Foundation
 import Combine
 
-class AlbumViewModel: ObservableObject {
-    
-    enum State:Comparable {
-        case good ,isLoading ,loadedAll , error(String)
-    }
+@MainActor
+class AlbumListViewModel: ObservableObject {
     
     @Published var albums: [Album] = []
     @Published var searchTerm: String = ""
-    @Published var state:State = .good {
-        didSet {
-            print("state changed to  \(state)")
-        }
-    }
+    @Published var state:FetchState = .good
     
      
     let limit:Int = 20
     var page:Int = 0
-    
+    let service = APIService()
     var subscriptions = Set<AnyCancellable>()
     
     init () {
@@ -55,37 +48,42 @@ class AlbumViewModel: ObservableObject {
            try await searchAlbums(for: searchTerm )
         }
     }
-    
-    
     func searchAlbums(for term:String) async throws {
         
         guard !searchTerm.isEmpty else { return }
         
-        guard state == State.good  else { return }
+        guard state == FetchState.good  else { return }
         
-        let offset = page * limit
-        let url = URL(string: "https://itunes.apple.com/search?term=\(term)&entity=album&limit=\(limit)&offset=\(offset)")!
-        
-        print("start fetching data fro \(searchTerm)")
+       
         state = .isLoading
         
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let decoder = JSONDecoder()
-        do {
-            let albumResult = try decoder.decode(AlbumResult.self, from: data)
-            for album in albumResult.results {
-                albums.append(album)
-            }
-            page += 1
-            state = (albumResult.results.count == limit ? .good : .loadedAll)
-          
-        } catch {
-            state = .error("Counldn't decode , \(error.localizedDescription)")
-        }
+        let result =  await service.fetchAlbums(searchTerm: searchTerm , page: page, limit: limit)
+        
+        switch result {
+                case .success(let albumResult):
+                    for album in albumResult.results {
+                           albums.append(album)
+                       }
+                       page += 1
+                       state = (albumResult.results.count == limit ? .good : .loadedAll)
+                case .failure(let error):
+                    state = .error(error.localizedDescription)
+                }
+       
         state = .good
         
     }
+    
+    static func example() -> AlbumListViewModel {
+        let vm = AlbumListViewModel()
+        vm.albums = [Album.preview]
+        return vm
+    }
+    
 }
+
+
+
 
     
    
